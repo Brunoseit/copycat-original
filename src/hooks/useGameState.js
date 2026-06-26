@@ -98,10 +98,14 @@ export default function useGameState() {
                 killerId: match.characterId || null, 
                 perkIds: match.perkIds || [],
                 result: null,
+                
+                // La foto heredada solo va a la imagen del Killer
                 image: s.survivor_match_images[index] || '', 
                 imageUrl: s.survivor_match_images[index] || '',
                 killerImage: s.survivor_match_images[index] || '',
-                survivorImage: s.survivor_match_images[index] || ''
+                
+                // ¡CORRECCIÓN! Esto empieza vacío para que puedas subir una foto nueva
+                survivorImage: '' 
             }));
 
             return { 

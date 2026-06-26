@@ -6,10 +6,12 @@ import { getPlayerName, KILLER_WIN_KILLS } from '../../data/dbdData';
 
 export default function KillerPhase({ state, onUpdateAssignment, onSaveFaced, onWin, onLose, onCompleteCycle, onUploadKillerImage, onUploadSurvivorImage, onReassign }) {
   const { findChar, killers } = useAssets();
+  
+  // ¡CORRECCIÓN 1! Leer directamente de donde guardamos todo en useGameState
   const assignments = state.killer_assignments || [];
-  const matches = state.killer_matches || [];
-  const killerImages = state.killer_match_images || [];       // survivors faced (uploadable)
-  const survivorImages = state.prev_survivor_images || [];   // killer screenshots from survi round (read-only, per card)
+  
+  // ¡CORRECCIÓN 2! Buscar las fotos en el lugar correcto de la Ronda 1
+  const survivorImages = state.survivor_match_images || []; 
 
   const killsNeeded = KILLER_WIN_KILLS[state.difficulty] || 3;
   const facedCount = state.num_players;
@@ -18,8 +20,9 @@ export default function KillerPhase({ state, onUpdateAssignment, onSaveFaced, on
   const poolKillerOptions = poolIds.map(findChar).filter(Boolean);
   const options = poolKillerOptions.length > 0 ? poolKillerOptions : killers;
 
-  const allDecided = matches.length > 0 && matches.every(m => m?.result);
-  const allWon = allDecided && matches.every(m => m?.result === 'win');
+  // ¡CORRECCIÓN 3! Verificar las victorias directamente desde los assignments
+  const allDecided = assignments.length > 0 && assignments.every(m => m?.result);
+  const allWon = allDecided && assignments.every(m => m?.result === 'win');
 
   return (
     <div className="max-w-5xl mx-auto px-4 py-6 sm:py-8">
@@ -32,7 +35,6 @@ export default function KillerPhase({ state, onUpdateAssignment, onSaveFaced, on
         </p>
       </motion.div>
 
-      {/* Killer match cards - each with its own survivor round screenshot */}
       <div className="space-y-4">
         {assignments.map((assignment, idx) => {
           const playerIdx = assignment?.playerIndex ?? idx;
@@ -46,9 +48,12 @@ export default function KillerPhase({ state, onUpdateAssignment, onSaveFaced, on
               allPlayerNames={state.player_names?.map((n, i) => n || getPlayerName([], i))}
               assignedPlayerIndex={playerIdx}
               assignment={assignment}
-              match={matches[idx]}
-              killerImageUrl={survivorImages[playerIdx] || ''}
-              survivorImageUrl={killerImages[idx] || ''}
+              match={assignment} // Unificamos match y assignment para evitar bugs
+              
+              // ¡CORRECCIÓN 4! Asegurar que la foto pase sí o sí a la tarjeta
+              killerImageUrl={survivorImages[playerIdx] || assignment.image || ''} 
+              survivorImageUrl={assignment.survivorImage || ''} 
+              
               onUploadKillerImage={onUploadKillerImage}
               onUploadSurvivorImage={onUploadSurvivorImage}
               onUpdateAssignment={onUpdateAssignment}
@@ -61,7 +66,6 @@ export default function KillerPhase({ state, onUpdateAssignment, onSaveFaced, on
         })}
       </div>
 
-      {/* Complete cycle */}
       <div className="mt-8 flex justify-end">
         <button
           onClick={onCompleteCycle}
