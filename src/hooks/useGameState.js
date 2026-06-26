@@ -58,7 +58,6 @@ export default function useGameState() {
             return { ...s, survivor_matches: newMatches, streak: nextStreak, high_score: Math.max(nextStreak, s.high_score) };
         }),
         
-        // ¡Arreglado! La derrota resetea ciclo, fase y limpia todo
         defeat: () => update(s => {
             saveToHistory('loss');
             return { 
@@ -92,12 +91,22 @@ export default function useGameState() {
 
         resetHighScore: () => update(s => ({ ...s, high_score: 0 })),
         
-        // ¡Arreglado! Inicia la fase de Killers creando las tarjetas para cada jugador
-        startKillerPhase: () => update(s => ({ 
-            ...s, 
-            phase: 'killer',
-            killer_assignments: Array(s.num_players).fill({ characterId: null, perkIds: [], result: null, image: '' })
-        })),
+        // ¡SOLUCIÓN 1! Heredar fotos y datos manuales a la fase Killer
+        startKillerPhase: () => update(s => {
+            const assignments = s.survivor_matches.map((match, index) => ({
+                playerIndex: index, // Inicialmente, el jugador 1 va a la tarjeta 1
+                characterId: match.characterId || null,
+                perkIds: match.perkIds || [],
+                result: null,
+                image: s.survivor_match_images[index] || '' // Hereda la foto subida
+            }));
+
+            return { 
+                ...s, 
+                phase: 'killer',
+                killer_assignments: assignments
+            };
+        }),
 
         completeCycle: () => update(s => ({ 
             ...s, 
@@ -108,7 +117,6 @@ export default function useGameState() {
             killer_assignments: []
         })),
 
-        // Funciones para la Fase Killer local
         updateKillerAssignment: (index, data) => update(s => {
             const newAssigns = [...s.killer_assignments];
             newAssigns[index] = { ...newAssigns[index], ...data };
@@ -117,15 +125,35 @@ export default function useGameState() {
         
         winKillerMatch: (index) => update(s => {
             const newAssigns = [...s.killer_assignments];
+            if (newAssigns[index].result === 'win') return s;
             newAssigns[index] = { ...newAssigns[index], result: 'win' };
             const nextStreak = s.streak + 1;
             saveToHistory('win', newAssigns[index].characterId);
             return { ...s, killer_assignments: newAssigns, streak: nextStreak, high_score: Math.max(nextStreak, s.high_score) };
         }),
 
-        reassignKiller: () => {},
-        saveKillerMatch: () => {},
-        uploadKillerImage: () => {},
-        uploadKillerSurvivorImage: () => {},
+        // ¡SOLUCIÓN 2! Habilitar el menú desplegable para cambiar al responsable
+        reassignKiller: (cardIndex, newPlayerIndex) => update(s => {
+            const newAssigns = [...s.killer_assignments];
+            newAssigns[cardIndex] = {
+                ...newAssigns[cardIndex],
+                playerIndex: parseInt(newPlayerIndex, 10)
+            };
+            return { ...s, killer_assignments: newAssigns };
+        }),
+
+        uploadKillerImage: (index, url) => update(s => {
+            const newAssigns = [...s.killer_assignments];
+            newAssigns[index] = { ...newAssigns[index], image: url };
+            return { ...s, killer_assignments: newAssigns };
+        }),
+
+        saveKillerMatch: (index, build) => update(s => {
+            const newAssigns = [...s.killer_assignments];
+            newAssigns[index] = { ...newAssigns[index], ...build };
+            return { ...s, killer_assignments: newAssigns };
+        }),
+        
+        uploadKillerSurvivorImage: () => {}, // Placeholder si lo usas distinto
     };
 }
