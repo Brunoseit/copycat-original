@@ -1,0 +1,44 @@
+{
+  "name": "GameAsset",
+  "type": "object",
+  "properties": {
+    "asset_type": {
+      "type": "string",
+      "enum": [
+        "killer",
+        "survivor",
+        "perk"
+      ],
+      "description": "Type of asset"
+    },
+    "name": {
+      "type": "string",
+      "description": "Display name"
+    },
+    "role": {
+      "type": "string",
+      "enum": [
+        "killer",
+        "survivor",
+        "general"
+      ],
+      "description": "For perks: which role can use it"
+    },
+    "character": {
+      "type": "string",
+      "description": "For perks: source character"
+    },
+    "image_url": {
+      "type": "string",
+      "description": "Uploaded image URL"
+    },
+    "color": {
+      "type": "string",
+      "description": "Fallback UI color (hex)"
+    }
+  },
+  "required": [
+    "asset_type",
+    "name"
+  ]
+}

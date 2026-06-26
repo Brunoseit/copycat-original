@@ -1,0 +1,156 @@
+{
+  "name": "GameState",
+  "type": "object",
+  "properties": {
+    "session_key": {
+      "type": "string",
+      "description": "Identifier of the shared game session",
+      "default": "main"
+    },
+    "configured": {
+      "type": "boolean",
+      "default": false,
+      "description": "Whether the challenge has been set up"
+    },
+    "num_players": {
+      "type": "number",
+      "default": 3,
+      "description": "Number of players in the group"
+    },
+    "difficulty": {
+      "type": "string",
+      "enum": [
+        "dificil",
+        "normal",
+        "baby",
+        "superbaby"
+      ],
+      "default": "normal"
+    },
+    "player_names": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "default": [],
+      "description": "Custom names of the players"
+    },
+    "streak": {
+      "type": "number",
+      "default": 0,
+      "description": "Current win streak"
+    },
+    "high_score": {
+      "type": "number",
+      "default": 0,
+      "description": "Best streak ever reached"
+    },
+    "cycle": {
+      "type": "number",
+      "default": 1,
+      "description": "Current loop cycle number"
+    },
+    "phase": {
+      "type": "string",
+      "enum": [
+        "survivor",
+        "killer"
+      ],
+      "default": "survivor",
+      "description": "Current phase of the loop"
+    },
+    "survivor_matches": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": true
+      },
+      "default": [],
+      "description": "Team survivor matches of the current cycle"
+    },
+    "survivor_match_images": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "default": [],
+      "description": "Screenshot URLs for each survivor match (killer faced)"
+    },
+    "survivor_expanded": {
+      "type": "array",
+      "items": {
+        "type": "boolean"
+      },
+      "default": [],
+      "description": "Which survivor cards have the editor expanded (synced)"
+    },
+    "prev_survivor_images": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "default": [],
+      "description": "Survivor match images from the previous cycle (killer screenshots)"
+    },
+    "killer_pool": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": true
+      },
+      "default": [],
+      "description": "Killers collected from survivor matches"
+    },
+    "killer_assignments": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": true
+      },
+      "default": [],
+      "description": "Killer assigned to each player with custom perks"
+    },
+    "killer_matches": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": true
+      },
+      "default": [],
+      "description": "Result of each player's killer match + faced survivor builds"
+    },
+    "killer_match_images": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "default": [],
+      "description": "Screenshot URLs for each killer match - survivors faced"
+    },
+    "killer_expanded": {
+      "type": "array",
+      "items": {
+        "type": "boolean"
+      },
+      "default": [],
+      "description": "Which killer cards have the editor expanded (synced)"
+    },
+    "individual_pools": {
+      "type": "object",
+      "additionalProperties": true,
+      "default": {},
+      "description": "Each player's individual survivor pool collected from their killer match"
+    },
+    "prev_killer_images": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "default": [],
+      "description": "Per-player screenshot of survivors faced in their killer match (from previous cycle)"
+    }
+  },
+  "required": [
+    "session_key"
+  ]
+}

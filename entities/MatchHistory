@@ -1,0 +1,56 @@
+{
+  "name": "MatchHistory",
+  "type": "object",
+  "properties": {
+    "cycle": {
+      "type": "number",
+      "description": "Cycle number when the match was played"
+    },
+    "phase": {
+      "type": "string",
+      "enum": [
+        "survivor",
+        "killer"
+      ]
+    },
+    "player_index": {
+      "type": "number",
+      "description": "Index of the player (0-based)"
+    },
+    "player_name": {
+      "type": "string"
+    },
+    "role": {
+      "type": "string",
+      "enum": [
+        "survivor",
+        "killer"
+      ]
+    },
+    "character_id": {
+      "type": "string",
+      "description": "Killer or survivor played/faced"
+    },
+    "character_name": {
+      "type": "string"
+    },
+    "perk_ids": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "default": []
+    },
+    "result": {
+      "type": "string",
+      "enum": [
+        "win",
+        "loss"
+      ]
+    }
+  },
+  "required": [
+    "role",
+    "result"
+  ]
+}
