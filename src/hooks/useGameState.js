@@ -91,14 +91,17 @@ export default function useGameState() {
 
         resetHighScore: () => update(s => ({ ...s, high_score: 0 })),
         
-        // ¡SOLUCIÓN 1! Heredar fotos y datos manuales a la fase Killer
         startKillerPhase: () => update(s => {
             const assignments = s.survivor_matches.map((match, index) => ({
-                playerIndex: index, // Inicialmente, el jugador 1 va a la tarjeta 1
+                playerIndex: index,
                 characterId: match.characterId || null,
+                killerId: match.characterId || null, 
                 perkIds: match.perkIds || [],
                 result: null,
-                image: s.survivor_match_images[index] || '' // Hereda la foto subida
+                image: s.survivor_match_images[index] || '', 
+                imageUrl: s.survivor_match_images[index] || '',
+                killerImage: s.survivor_match_images[index] || '',
+                survivorImage: s.survivor_match_images[index] || ''
             }));
 
             return { 
@@ -132,7 +135,6 @@ export default function useGameState() {
             return { ...s, killer_assignments: newAssigns, streak: nextStreak, high_score: Math.max(nextStreak, s.high_score) };
         }),
 
-        // ¡SOLUCIÓN 2! Habilitar el menú desplegable para cambiar al responsable
         reassignKiller: (cardIndex, newPlayerIndex) => update(s => {
             const newAssigns = [...s.killer_assignments];
             newAssigns[cardIndex] = {
@@ -144,7 +146,13 @@ export default function useGameState() {
 
         uploadKillerImage: (index, url) => update(s => {
             const newAssigns = [...s.killer_assignments];
-            newAssigns[index] = { ...newAssigns[index], image: url };
+            newAssigns[index] = { ...newAssigns[index], killerImage: url, imageUrl: url };
+            return { ...s, killer_assignments: newAssigns };
+        }),
+
+        uploadKillerSurvivorImage: (index, url) => update(s => {
+            const newAssigns = [...s.killer_assignments];
+            newAssigns[index] = { ...newAssigns[index], survivorImage: url };
             return { ...s, killer_assignments: newAssigns };
         }),
 
@@ -152,8 +160,6 @@ export default function useGameState() {
             const newAssigns = [...s.killer_assignments];
             newAssigns[index] = { ...newAssigns[index], ...build };
             return { ...s, killer_assignments: newAssigns };
-        }),
-        
-        uploadKillerSurvivorImage: () => {}, // Placeholder si lo usas distinto
+        })
     };
 }
