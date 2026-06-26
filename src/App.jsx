@@ -8,7 +8,9 @@ import ScrollToTop from './components/ScrollToTop';
 import Home from '@/pages/Home';
 import Stats from '@/pages/Stats';
 import Settings from '@/pages/Settings';
+import Lobby from '@/pages/Lobby';
 import { AssetsProvider } from '@/lib/AssetsContext';
+
 
 function App() {
   return (
@@ -19,7 +21,8 @@ function App() {
           {/* Quitamos las barreras de seguridad y cargamos el juego directo */}
           <AssetsProvider>
             <Routes>
-              <Route path="/" element={<Home />} />
+              <Route path="/" element={<Lobby />} />
+              <Route path="/game" element={<Home />} />
               <Route path="/stats" element={<Stats />} />
               <Route path="/settings" element={<Settings />} />
               <Route path="*" element={<PageNotFound />} />

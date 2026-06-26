@@ -1,4 +1,3 @@
-//@ts-nocheck
 import { motion, AnimatePresence } from 'framer-motion';
 import { Skull, Trophy, CheckCircle2, ChevronDown, ChevronUp } from 'lucide-react';
 import BuildEditor from './BuildEditor';

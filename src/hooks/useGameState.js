@@ -15,6 +15,7 @@ export default function useGameState() {
             phase: 'survivor',
             survivor_matches: [{ result: null }, { result: null }, { result: null }],
             survivor_match_images: ['', '', ''],
+            survivor_pool: [{ image: '', faced: [] }, { image: '', faced: [] }, { image: '', faced: [] }],
             survivor_expanded: [false, false, false],
             killer_assignments: [],
         };
@@ -33,7 +34,6 @@ export default function useGameState() {
         localStorage.setItem('dbd_match_history', JSON.stringify(list));
     };
 
-    // ¡CORRECCIÓN 2! Función de limpieza profunda para reiniciar todo a 0
     const resetStateToStart = (s) => ({
         ...s,
         configured: false,
@@ -42,6 +42,7 @@ export default function useGameState() {
         phase: 'survivor',
         survivor_matches: Array(s.num_players || 3).fill({ result: null }),
         survivor_match_images: Array(s.num_players || 3).fill(''),
+        survivor_pool: Array(s.num_players || 3).fill({ image: '', faced: [] }),
         survivor_expanded: Array(s.num_players || 3).fill(false),
         killer_assignments: []
     });
@@ -56,10 +57,10 @@ export default function useGameState() {
             ...s, configured: true, num_players: num, difficulty: diff, player_names: names,
             survivor_matches: Array(num).fill({ result: null }),
             survivor_match_images: Array(num).fill(''),
+            survivor_pool: Array(num).fill({ image: '', faced: [] }),
             survivor_expanded: Array(num).fill(false)
         })),
         
-        // Aplicamos la limpieza profunda a los botones de Nueva Sesión y Cambiar Configuración
         newSession: () => update(s => resetStateToStart(s)),
         reset: () => update(s => resetStateToStart(s)),
         
@@ -81,6 +82,7 @@ export default function useGameState() {
                 phase: 'survivor',
                 survivor_matches: Array(s.num_players).fill({ result: null }),
                 survivor_match_images: Array(s.num_players).fill(''),
+                survivor_pool: Array(s.num_players).fill({ image: '', faced: [] }),
                 killer_assignments: []
             };
         }),
@@ -115,7 +117,8 @@ export default function useGameState() {
                 image: s.survivor_match_images[index] || '', 
                 imageUrl: s.survivor_match_images[index] || '',
                 killerImage: s.survivor_match_images[index] || '',
-                survivorImage: '' // Empieza vacío
+                survivorImage: '',
+                faced: [] // Inicializamos el manual vacío
             }));
 
             return { 
@@ -125,15 +128,29 @@ export default function useGameState() {
             };
         }),
 
-        completeCycle: () => update(s => ({ 
-            ...s, 
-            cycle: s.cycle + 1, 
-            phase: 'survivor',
-            survivor_matches: Array(s.num_players).fill({ result: null }),
-            survivor_match_images: Array(s.num_players).fill(''),
-            // Limpiamos los assignments de killers pero mantenemos la racha
-            killer_assignments: [] 
-        })),
+        completeCycle: () => update(s => {
+            // Guardamos tanto la foto como la selección manual en la Pool
+            const nextPool = Array(s.num_players).fill({ image: '', faced: [] });
+            s.killer_assignments.forEach((assign, idx) => {
+                const pIndex = assign.playerIndex ?? idx;
+                if (pIndex >= 0 && pIndex < s.num_players) {
+                    nextPool[pIndex] = {
+                        image: assign.survivorImage || '',
+                        faced: assign.faced || []
+                    };
+                }
+            });
+
+            return { 
+                ...s, 
+                cycle: s.cycle + 1, 
+                phase: 'survivor',
+                survivor_matches: Array(s.num_players).fill({ result: null }),
+                survivor_match_images: Array(s.num_players).fill(''), 
+                survivor_pool: nextPool, 
+                killer_assignments: [] 
+            };
+        }),
 
         updateKillerAssignment: (index, data) => update(s => {
             const newAssigns = [...s.killer_assignments];
@@ -152,18 +169,17 @@ export default function useGameState() {
 
         reassignKiller: (cardIndex, newPlayerIndex) => update(s => {
             const newAssigns = [...s.killer_assignments];
-            // Mantenemos la foto que ya existía en esa tarjeta aunque cambiemos de jugador
             const existingImage = newAssigns[cardIndex].survivorImage;
-            
+            const existingFaced = newAssigns[cardIndex].faced;
             newAssigns[cardIndex] = {
                 ...newAssigns[cardIndex],
                 playerIndex: parseInt(newPlayerIndex, 10),
-                survivorImage: existingImage 
+                survivorImage: existingImage,
+                faced: existingFaced
             };
             return { ...s, killer_assignments: newAssigns };
         }),
 
-       // Función única y limpia para subir la imagen de los supervivientes enfrentados
         uploadKillerSurvivorImage: (index, url) => update(s => {
             const newAssigns = [...s.killer_assignments];
             newAssigns[index] = { ...newAssigns[index], survivorImage: url };
@@ -175,5 +191,5 @@ export default function useGameState() {
             newAssigns[index] = { ...newAssigns[index], ...build };
             return { ...s, killer_assignments: newAssigns };
         })
-    }; // Cierra el return
-} // Cierra la función principal
+    };
+}

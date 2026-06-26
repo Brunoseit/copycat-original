@@ -13,9 +13,11 @@ export default function KillerMatchCard({
   onUploadKillerImage, onUploadSurvivorImage, onUpdateAssignment,
   onSaveFaced, onWin, onLose, onReassign,
 }) {
-  const { perks, survivors } = useAssets();
+  // ¡CORRECCIÓN 1! Traemos findChar para buscar la imagen del Killer manual
+  const { perks, survivors, findChar } = useAssets();
   const killerPerks = perks.filter(p => p.rol === 'killer');
   const survivorPerks = perks.filter(p => p.rol === 'survivor');
+  
   const [buildOpen, setBuildOpen] = useState(false);
   const [surviOpen, setSurviOpen] = useState(false);
   const [lightboxSrc, setLightboxSrc] = useState(null);
@@ -24,13 +26,18 @@ export default function KillerMatchCard({
   const faced = match?.faced || Array.from({ length: facedCount }, () => ({ characterId: null, perkIds: ['', '', '', ''] }));
   const playerName = allPlayerNames?.[index] || `Jugador ${index + 1}`;
 
+  // ¡CORRECCIÓN 2! Arreglamos el error que bloqueaba el guardado enviando los datos como objeto { faced: next }
   const setFaced = (i, build) => {
     const next = [...faced];
     next[i] = { ...next[i], ...build };
-    onSaveFaced(index, next);
+    onSaveFaced(index, { faced: next });
   };
 
   const completedFaced = faced.filter(b => b?.characterId);
+
+  // ¡CORRECCIÓN 3! Si no hay screenshot de la ronda 1, busca la imagen del personaje en la Base de Datos
+  const selectedKillerDb = findChar(assignment?.characterId);
+  const finalKillerImage = killerImageUrl || (selectedKillerDb?.imageUrl ? selectedKillerDb.imageUrl : null);
 
   return (
     <motion.div
@@ -41,7 +48,6 @@ export default function KillerMatchCard({
           : result === 'loss' ? 'border-red-800/60 ring-1 ring-red-900/40'
           : 'border-zinc-800/60'}`}
     >
-      {/* Header: player name dropdown as title + result badge */}
       <div className="flex items-center gap-3 px-4 py-3">
         <Skull className="w-4 h-4 text-red-500 shrink-0" />
         {result ? (
@@ -68,21 +74,19 @@ export default function KillerMatchCard({
         Objetivo: matar <span className="text-red-400 font-semibold">{killsNeeded}</span> superviviente(s)
       </p>
 
-      {/* Two screenshots side by side */}
       <div className="px-4 pb-3 space-y-3">
         {lightboxSrc && <ImageLightbox src={lightboxSrc} onClose={() => setLightboxSrc(null)} />}
 
-        {/* Screenshot 1: Killer a jugar (from survivor round) */}
         <div>
           <p className="text-[10px] text-zinc-500 uppercase tracking-wider mb-1.5 flex items-center gap-1">
             <Camera className="w-3 h-3" /> Killer que debes jugar
           </p>
-          {killerImageUrl ? (
+          {finalKillerImage ? (
             <div
-              className="rounded-lg overflow-hidden border border-zinc-700/50 cursor-zoom-in group/ki relative"
-              onClick={() => setLightboxSrc(killerImageUrl)}
+              className="rounded-lg overflow-hidden border border-zinc-700/50 cursor-zoom-in group/ki relative bg-zinc-900"
+              onClick={() => setLightboxSrc(finalKillerImage)}
             >
-              <img src={killerImageUrl} alt="Killer a jugar" className="w-full h-44 sm:h-52 object-cover" />
+              <img src={finalKillerImage} alt="Killer a jugar" className="w-full h-44 sm:h-52 object-cover" />
               <div className="absolute top-2 left-2 opacity-0 group-hover/ki:opacity-100 transition-opacity pointer-events-none">
                 <span className="bg-black/60 text-white text-[10px] px-1.5 py-0.5 rounded flex items-center gap-1">
                   <ZoomIn className="w-3 h-3" /> Ver
@@ -91,12 +95,11 @@ export default function KillerMatchCard({
             </div>
           ) : (
             <div className="w-full h-20 rounded-lg border border-dashed border-zinc-700/40 bg-zinc-800/30 flex items-center justify-center text-xs text-zinc-600">
-              Sin screenshot del killer a jugar
+              Sin imagen o screenshot del killer
             </div>
           )}
         </div>
 
-        {/* Screenshot 2: Survivors faced (uploadable) */}
         <div>
           <p className="text-[10px] text-zinc-500 uppercase tracking-wider mb-1.5 flex items-center gap-1">
             <Camera className="w-3 h-3" /> Screenshot supervivientes enfrentados
@@ -110,10 +113,8 @@ export default function KillerMatchCard({
         </div>
       </div>
 
-      {/* Expandable sections only when not yet decided */}
       {!result && (
         <>
-          {/* Faced survivors collapsible */}
           <button
             onClick={() => setSurviOpen(!surviOpen)}
             className="mx-4 w-[calc(100%-2rem)] flex items-center justify-between px-3 py-2 rounded-lg bg-blue-950/20 border border-blue-900/30 text-blue-300 text-xs font-semibold"
@@ -148,7 +149,6 @@ export default function KillerMatchCard({
             )}
           </AnimatePresence>
 
-          {/* Killer build: expandable */}
           <button
             onClick={() => setBuildOpen(!buildOpen)}
             className="mt-2 mx-4 w-[calc(100%-2rem)] flex items-center justify-between px-3 py-2 rounded-lg bg-zinc-800/50 border border-zinc-700/30 text-zinc-400 text-xs font-medium hover:bg-zinc-800/70 transition-all"
@@ -181,7 +181,6 @@ export default function KillerMatchCard({
         </>
       )}
 
-      {/* Win/Lose buttons */}
       {!result && (
         <div className="px-4 pb-4 pt-3 flex gap-2">
           <button

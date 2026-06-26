@@ -7,10 +7,7 @@ import { getPlayerName, KILLER_WIN_KILLS } from '../../data/dbdData';
 export default function KillerPhase({ state, onUpdateAssignment, onSaveFaced, onWin, onLose, onCompleteCycle, onUploadKillerImage, onUploadSurvivorImage, onReassign }) {
   const { findChar, killers } = useAssets();
   
-  // ¡CORRECCIÓN 1! Leer directamente de donde guardamos todo en useGameState
   const assignments = state.killer_assignments || [];
-  
-  // ¡CORRECCIÓN 2! Buscar las fotos en el lugar correcto de la Ronda 1
   const survivorImages = state.survivor_match_images || []; 
 
   const killsNeeded = KILLER_WIN_KILLS[state.difficulty] || 3;
@@ -20,7 +17,6 @@ export default function KillerPhase({ state, onUpdateAssignment, onSaveFaced, on
   const poolKillerOptions = poolIds.map(findChar).filter(Boolean);
   const options = poolKillerOptions.length > 0 ? poolKillerOptions : killers;
 
-  // ¡CORRECCIÓN 3! Verificar las victorias directamente desde los assignments
   const allDecided = assignments.length > 0 && assignments.every(m => m?.result);
   const allWon = allDecided && assignments.every(m => m?.result === 'win');
 
@@ -48,12 +44,13 @@ export default function KillerPhase({ state, onUpdateAssignment, onSaveFaced, on
               allPlayerNames={state.player_names?.map((n, i) => n || getPlayerName([], i))}
               assignedPlayerIndex={playerIdx}
               assignment={assignment}
-              match={assignment} // Unificamos match y assignment para evitar bugs
+              match={assignment}
               
-              // ¡CORRECCIÓN 4! Asegurar que la foto pase sí o sí a la tarjeta
-              killerImageUrl={survivorImages[playerIdx] || assignment.image || ''} 
+              // ¡CORRECCIÓN! Ahora usamos 'idx' (tarjeta) en lugar de 'playerIdx' (jugador).
+              // Así la foto se queda fija en esta partida aunque cambies al responsable.
+              killerImageUrl={assignment.image || survivorImages[idx] || ''} 
+              
               survivorImageUrl={assignment.survivorImage || ''} 
-              
               onUploadKillerImage={onUploadKillerImage}
               onUploadSurvivorImage={onUploadSurvivorImage}
               onUpdateAssignment={onUpdateAssignment}

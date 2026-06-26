@@ -4,13 +4,9 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 const AssetsContext = createContext(null);
 
 export const AssetsProvider = ({ children }) => {
-    // La base de datos ahora guarda un array de objetos completos
     const [customAssets, setCustomAssets] = useState(() => {
         const saved = localStorage.getItem('local_dbd_assets');
-        return saved ? JSON.parse(saved) : [
-            { id: 'k1', type: 'character', role: 'killer', name: 'The Trapper', imageUrl: '' },
-            { id: 's1', type: 'character', role: 'survivor', name: 'Dwight Fairfield', imageUrl: '' }
-        ];
+        return saved ? JSON.parse(saved) : [];
     });
 
     useEffect(() => {
@@ -18,7 +14,8 @@ export const AssetsProvider = ({ children }) => {
     }, [customAssets]);
 
     const addAsset = (assetData) => {
-        if (!assetData.name.trim()) return;
+        // ¡CORRECCIÓN! Usar 'nombre' en lugar de 'name' para que el juego lo reconozca
+        if (!assetData.nombre.trim()) return;
         const newAsset = { ...assetData, id: Date.now().toString() };
         setCustomAssets(prev => [...prev, newAsset]);
     };
@@ -27,14 +24,17 @@ export const AssetsProvider = ({ children }) => {
         setCustomAssets(prev => prev.filter(a => a.id !== id));
     };
 
-    // Separamos las listas para que los desplegables del juego las encuentren
+    // ¡NUEVO! Función para cargar una base de datos desde un archivo
+    const importAssets = (importedList) => {
+        setCustomAssets(importedList);
+    };
+
     const killers = customAssets.filter(a => a.type === 'character' && a.role === 'killer');
     const survivors = customAssets.filter(a => a.type === 'character' && a.role === 'survivor');
     const perks = customAssets.filter(a => a.type === 'perk');
 
-    // Funciones de búsqueda para que el juego pueda cargar las imágenes al seleccionar
-    const findChar = (id) => customAssets.find(a => a.id === id) || { name: 'Desconocido', imageUrl: '' };
-    const findPerk = (id) => customAssets.find(a => a.id === id) || { name: 'Perk Desconocida', imageUrl: '' };
+    const findChar = (id) => customAssets.find(a => a.id === id) || { nombre: 'Desconocido', imageUrl: '' };
+    const findPerk = (id) => customAssets.find(a => a.id === id) || { nombre: 'Perk Desconocida', imageUrl: '' };
 
     return (
         <AssetsContext.Provider value={{ 
@@ -46,6 +46,7 @@ export const AssetsProvider = ({ children }) => {
             perks,
             addAsset,
             removeAsset,
+            importAssets,
             findChar,
             findPerk
         }}>
