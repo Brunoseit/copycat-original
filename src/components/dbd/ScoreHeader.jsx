@@ -1,9 +1,11 @@
 import { motion } from 'framer-motion';
-import { Flame, Trophy, Skull, BarChart3, Settings, RotateCcw, Wrench, HelpCircle } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Flame, Trophy, Skull, BarChart3, Settings, RotateCcw, Wrench, HelpCircle, Home } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
 import { DIFFICULTY_LABELS } from '../../data/dbdData';
 
 export default function ScoreHeader({ state, winCondition, onDefeat, onReset, onShowRules }) {
+  const navigate = useNavigate();
+
   return (
     <div className="bg-zinc-900/80 backdrop-blur-sm border-b border-zinc-800/60 sticky top-0 z-40">
       <div className="max-w-5xl mx-auto px-4 py-3">
@@ -37,6 +39,12 @@ export default function ScoreHeader({ state, winCondition, onDefeat, onReset, on
           </div>
 
           <div className="flex items-center gap-2">
+            <button
+              onClick={() => navigate('/')}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium bg-blue-900/20 border border-blue-700/30 text-blue-300 hover:bg-blue-900/40 transition-all"
+            >
+              <Home className="w-3.5 h-3.5" /> Lobby
+            </button>
             <button
               onClick={onShowRules}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium bg-zinc-800/60 border border-zinc-700/40 text-zinc-300 hover:bg-zinc-800 transition-all"

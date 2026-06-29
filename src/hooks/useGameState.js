@@ -1,31 +1,53 @@
 // @ts-nocheck
 import { useState, useEffect } from 'react';
+import { useSocket } from '../lib/SocketContext';
 
 export default function useGameState() {
-    const [state, setState] = useState(() => {
-        const saved = localStorage.getItem('dbd_copycat_state');
-        return saved ? JSON.parse(saved) : {
-            configured: false,
-            num_players: 3,
-            difficulty: 'normal',
-            player_names: ['Jugador 1', 'Jugador 2', 'Jugador 3'],
-            streak: 0,
-            high_score: 0,
-            cycle: 1,
-            phase: 'survivor',
-            survivor_matches: [{ result: null }, { result: null }, { result: null }],
-            survivor_match_images: ['', '', ''],
-            survivor_pool: [{ image: '', faced: [] }, { image: '', faced: [] }, { image: '', faced: [] }],
-            survivor_expanded: [false, false, false],
-            killer_assignments: [],
-        };
+    const { socket, room } = useSocket();
+
+    const [state, setState] = useState({
+        configured: false,
+        num_players: 3,
+        difficulty: 'normal',
+        player_names: ['Jugador 1', 'Jugador 2', 'Jugador 3'],
+        streak: 0,
+        high_score: 0,
+        cycle: 1,
+        phase: 'survivor',
+        survivor_matches: [{ result: null }, { result: null }, { result: null }],
+        survivor_match_images: ['', '', ''],
+        survivor_pool: [{ image: '', faced: [] }, { image: '', faced: [] }, { image: '', faced: [] }],
+        survivor_expanded: [false, false, false],
+        killer_assignments: [],
     });
 
+    // Sincronización: Escuchar cambios del servidor
     useEffect(() => {
-        localStorage.setItem('dbd_copycat_state', JSON.stringify(state));
-    }, [state]);
+        if (!socket) return;
+        
+        const handleUpdate = (data) => {
+            // El servidor ahora envía { room, gameState }
+            if (data.room === room) {
+                console.log(`[${room}] Sincronizando estado recibido del servidor.`);
+                setState({ ...data.gameState });
+            }
+        };
 
-    const update = (fn) => setState(prev => fn(prev));
+        socket.on('update-state', handleUpdate);
+        return () => socket.off('update-state', handleUpdate);
+    }, [socket, room]);
+
+    // Función envoltorio para emitir cambios al servidor
+    const update = (fn) => {
+        setState(prev => {
+            const next = fn(prev);
+            // Solo emitimos si tenemos una sala activa
+            if (room && socket) {
+                socket.emit('game-update', { room, gameState: next });
+            }
+            return { ...next };
+        });
+    };
 
     const saveToHistory = (result, charId = null) => {
         const history = localStorage.getItem('dbd_match_history');
@@ -53,6 +75,10 @@ export default function useGameState() {
         winCondition: 2, 
         helpers: { emptyBuild: () => ({}) },
         
+        joinRoom: (roomName) => {
+            // joinRoom ya no necesita lógica aquí, el SocketContext se encarga de emitir al servidor
+        },
+
         configure: (num, diff, names) => update(s => ({ 
             ...s, configured: true, num_players: num, difficulty: diff, player_names: names,
             survivor_matches: Array(num).fill({ result: null }),
@@ -118,18 +144,13 @@ export default function useGameState() {
                 imageUrl: s.survivor_match_images[index] || '',
                 killerImage: s.survivor_match_images[index] || '',
                 survivorImage: '',
-                faced: [] // Inicializamos el manual vacío
+                faced: []
             }));
 
-            return { 
-                ...s, 
-                phase: 'killer',
-                killer_assignments: assignments
-            };
+            return { ...s, phase: 'killer', killer_assignments: assignments };
         }),
 
         completeCycle: () => update(s => {
-            // Guardamos tanto la foto como la selección manual en la Pool
             const nextPool = Array(s.num_players).fill({ image: '', faced: [] });
             s.killer_assignments.forEach((assign, idx) => {
                 const pIndex = assign.playerIndex ?? idx;
