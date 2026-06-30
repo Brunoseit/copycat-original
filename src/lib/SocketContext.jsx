@@ -4,10 +4,10 @@ import { io } from 'socket.io-client';
 const SocketContext = createContext(null);
 
 export const SocketProvider = ({ children }) => {
-    // Inicializamos el socket dentro de useMemo para evitar recreaciones innecesarias
     const socket = useMemo(() => io('http://localhost:3000'), []);
     
-    const [room, setRoom] = useState(localStorage.getItem('dbd_room_name') || null);
+    const [room, setRoom] = useState(null);
+    const [isCreator, setIsCreator] = useState(false);
     const [isConnected, setIsConnected] = useState(socket.connected);
 
     useEffect(() => {
@@ -17,9 +17,9 @@ export const SocketProvider = ({ children }) => {
         socket.on('connect', onConnect);
         socket.on('disconnect', onDisconnect);
         
-        // Si hay una sala guardada, reconectamos
+        // CORRECCIÓN: Si nos reconectamos, debemos enviar el objeto completo, no un string
         if (room) {
-            socket.emit('join-room', room);
+            socket.emit('join-room', { room: room, password: '' });
         }
 
         return () => {
@@ -28,21 +28,52 @@ export const SocketProvider = ({ children }) => {
         };
     }, [socket, room]); 
 
-    const joinRoom = (newRoom) => {
-        if (room) socket.emit('leave-room', room);
-        setRoom(newRoom);
-        localStorage.setItem('dbd_room_name', newRoom);
-        socket.emit('join-room', newRoom);
+    const createRoom = (roomName, password = '', maxPlayers = 4) => {
+        return new Promise((resolve) => {
+            socket.emit('create-room', { room: roomName, password, maxPlayers }, (response) => {
+                // Si el servidor falla o no responde bien, evitamos que la app se cuelgue
+                const res = response || { success: false, message: 'Error de red' };
+                if (res.success) {
+                    setRoom(roomName);
+                    setIsCreator(true);
+                }
+                resolve(res);
+            });
+        });
+    };
+
+    const joinRoom = (roomName, password = '') => {
+        return new Promise((resolve) => {
+            socket.emit('join-room', { room: roomName, password }, (response) => {
+                const res = response || { success: false, message: 'Error de red' };
+                if (res.success) {
+                    setRoom(roomName);
+                    setIsCreator(res.isCreator);
+                }
+                resolve(res);
+            });
+        });
     };
 
     const leaveRoom = () => {
         if (room) socket.emit('leave-room', room);
         setRoom(null);
-        localStorage.removeItem('dbd_room_name');
+        setIsCreator(false);
+    };
+
+    const requestDeleteRoom = (roomNameToDelete) => {
+        return new Promise((resolve) => {
+            socket.emit('delete-room', roomNameToDelete, (response) => {
+                resolve(response || { success: false });
+            });
+        });
     };
 
     return (
-        <SocketContext.Provider value={{ socket, room, joinRoom, leaveRoom, isConnected }}>
+        <SocketContext.Provider value={{ 
+            socket, room, isCreator, isConnected, 
+            createRoom, joinRoom, leaveRoom, requestDeleteRoom 
+        }}>
             {children}
         </SocketContext.Provider>
     );
@@ -50,8 +81,6 @@ export const SocketProvider = ({ children }) => {
 
 export const useSocket = () => {
     const context = useContext(SocketContext);
-    if (!context) {
-        throw new Error("useSocket debe ser usado dentro de un SocketProvider");
-    }
+    if (!context) throw new Error("useSocket debe ser usado dentro de un SocketProvider");
     return context;
 };
