@@ -10,6 +10,7 @@
     "lint:fix": "eslint . --fix",
     "typecheck": "tsc -p ./jsconfig.json",
     "preview": "vite preview"
+    "start": "node server.js"
   },
   "dependencies": {
     "@base44/sdk": "^0.8.32",
@@ -52,7 +53,7 @@
     "cmdk": "^1.0.0",
     "date-fns": "^3.6.0",
     "embla-carousel-react": "^8.5.2",
-    "express": "^5.2.1",
+    "express": "^4.21.0",
     "framer-motion": "^11.16.4",
     "html2canvas": "^1.4.1",
     "input-otp": "^1.4.2",

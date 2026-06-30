@@ -1,20 +1,27 @@
 import express from 'express';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+// Configuraciones para leer rutas de archivos en Node (ES Modules)
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const app = express();
 const httpServer = createServer(app);
 const io = new Server(httpServer, { cors: { origin: "*" } });
 
-// Usamos let para permitir limpieza si fuera necesario
+// --- ¡NUEVO! Servir el Frontend empaquetado ---
+// Le decimos a Express que la carpeta 'dist' tiene los archivos públicos (tu app de React)
+app.use(express.static(path.join(__dirname, 'dist')));
+
 let roomData = {}; 
 
 const getPublicRooms = () => {
     const publicRooms = [];
     for (const [name, data] of Object.entries(roomData)) {
-        // Protección: Si la sala está corrupta, la ignoramos
         if (!name || !data) continue; 
-        
         const currentPlayers = io.sockets.adapter.rooms.get(name)?.size || 0;
         publicRooms.push({
             name: name,
@@ -27,16 +34,25 @@ const getPublicRooms = () => {
     return publicRooms;
 };
 
+const reassignCreator = (roomName, oldCreatorId) => {
+    const targetRoom = roomData[roomName];
+    if (targetRoom && targetRoom.creator === oldCreatorId) {
+        const socketsInRoom = io.sockets.adapter.rooms.get(roomName);
+        if (socketsInRoom && socketsInRoom.size > 0) {
+            const newCreator = Array.from(socketsInRoom)[0];
+            targetRoom.creator = newCreator;
+            io.to(newCreator).emit('room-info', { mode: targetRoom.mode, isCreator: true });
+        }
+    }
+};
+
 io.on('connection', (socket) => {
-    
     socket.on('get-rooms', () => {
         socket.emit('room-list', getPublicRooms());
     });
 
     socket.on('create-room', (payload, callback) => {
-        // Si por algún motivo no hay callback, cancelamos para no romper el server
         if (!callback) return; 
-        
         const room = payload?.room;
         const password = payload?.password || '';
         const maxPlayers = parseInt(payload?.maxPlayers) || 4;
@@ -60,10 +76,7 @@ io.on('connection', (socket) => {
     });
 
     socket.on('join-room', (payload, callback) => {
-        // Creamos un callback vacío por si es una reconexión automática sin callback
         const cb = callback || function() {};
-        
-        // Soportar el formato antiguo (string) y el nuevo (objeto)
         const room = typeof payload === 'string' ? payload : payload?.room;
         const password = typeof payload === 'string' ? '' : payload?.password;
 
@@ -84,13 +97,23 @@ io.on('connection', (socket) => {
         socket.rooms.forEach((r) => { if (r !== socket.id) socket.leave(r); });
         socket.join(room);
 
-        socket.emit('room-info', { mode: targetRoom.mode, isCreator: targetRoom.creator === socket.id });
-        if (targetRoom.gameState) {
-            socket.emit('update-state', { room, gameState: targetRoom.gameState });
+        if (!io.sockets.adapter.rooms.get(room)?.has(targetRoom.creator)) {
+            targetRoom.creator = socket.id;
         }
-        
-        io.emit('room-list', getPublicRooms()); 
+
         cb({ success: true, isCreator: targetRoom.creator === socket.id });
+        io.emit('room-list', getPublicRooms()); 
+    });
+
+    socket.on('request-sync', (room, callback) => {
+        const targetRoom = roomData[room];
+        if (targetRoom && callback) {
+            callback({
+                mode: targetRoom.mode,
+                isCreator: targetRoom.creator === socket.id,
+                gameState: targetRoom.gameState
+            });
+        }
     });
 
     socket.on('delete-room', (room, callback) => {
@@ -99,9 +122,8 @@ io.on('connection', (socket) => {
         
         if (targetRoom) {
             const currentPlayers = io.sockets.adapter.rooms.get(room)?.size || 0;
-            // Solo borra si la sala está vacía O si el que hace clic es el creador original
             if (currentPlayers === 0 || targetRoom.creator === socket.id) {
-                io.in(room).socketsLeave(room); // Expulsa a todos si había alguien
+                io.in(room).socketsLeave(room); 
                 delete roomData[room];
                 io.emit('room-list', getPublicRooms());
                 cb({ success: true });
@@ -131,12 +153,31 @@ io.on('connection', (socket) => {
 
     socket.on('leave-room', (room) => {
         socket.leave(room);
+        reassignCreator(room, socket.id);
         io.emit('room-list', getPublicRooms());
     });
 
     socket.on('disconnect', () => {
+        for (const [roomName, data] of Object.entries(roomData)) {
+            if (data.creator === socket.id) {
+                reassignCreator(roomName, socket.id);
+            }
+        }
         setTimeout(() => { io.emit('room-list', getPublicRooms()); }, 500);
     });
 });
 
-httpServer.listen(3000, () => console.log('Servidor blindado listo en el puerto 3000'));
+// --- ¡NUEVO! Forzar a que cualquier ruta que no sea de sockets cargue React ---
+app.use(express.static(path.join(__dirname, 'dist')));
+
+// 2. Ruta para SPA: Todo lo que no sea un archivo estático o una API 
+// debe devolver el index.html para que React Router lo maneje.
+app.get('*', (req, res, next) => {
+    // Si la ruta contiene 'socket.io', dejamos que el servidor de sockets la maneje
+    if (req.url.includes('socket.io')) return next();
+    
+    res.sendFile(path.join(__dirname, 'dist', 'index.html'));
+});
+
+// Levantar el servidor
+httpServer.listen(3000, () => console.log('Servidor Unificado listo en el puerto 3000'));

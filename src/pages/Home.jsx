@@ -20,27 +20,47 @@ export default function Home() {
   const [confirmReset, setConfirmReset] = useState(false);
   const [showRules, setShowRules] = useState(false);
 
-  // Escuchar el modo de juego desde el servidor
+  // Sincronización instantánea y blindada
   useEffect(() => {
-    if (!socket) return;
+    if (!socket || !room) return;
     
+    const syncWithServer = () => {
+      // Pedimos datos directos mediante callback, sin esperar eventos flotantes
+      socket.emit('request-sync', room, (data) => {
+        if (data) {
+          if (data.mode) setMode(data.mode);
+          if (data.gameState) {
+            g.forceSync(data.gameState);
+          }
+        }
+      });
+    };
+
+    // 1. Sincronizar inmediatamente al abrir la página
+    syncWithServer();
+
+    // 2. Escuchar si cambian el modo estando dentro
     const handleRoomInfo = (data) => {
       if (data.mode) setMode(data.mode);
     };
-    
+
+    // 3. Volver a sincronizar si hubo un micro-corte de internet
+    socket.on('connect', syncWithServer);
     socket.on('room-info', handleRoomInfo);
     
-    return () => socket.off('room-info', handleRoomInfo);
-  }, [socket]);
+    return () => {
+      socket.off('connect', syncWithServer);
+      socket.off('room-info', handleRoomInfo);
+    };
+  }, [socket, room]);
 
-  // Fallback de seguridad: si recibimos un estado ya configurado, forzamos el modo visual
+  // Fallback de seguridad
   useEffect(() => {
     if (state && state.configured && mode !== 'copycat') {
       setMode('copycat');
     }
   }, [state, mode]);
 
-  // Mostrar reglas la primera vez que se configura el juego
   useEffect(() => {
     if (!loading && state?.configured === false) return;
     const seen = localStorage.getItem('dbd_rules_seen');
@@ -50,13 +70,11 @@ export default function Home() {
     }
   }, [loading, state?.configured, mode]);
 
-  // Emitir la selección del modo al servidor
   const handleSelectMode = (selectedMode) => {
     socket.emit('set-mode', { room, mode: selectedMode });
     setMode(selectedMode);
   };
 
-  // 1. PANTALLA DE SELECCIÓN DE MODO (Si aún no hay modo elegido)
   if (!mode) {
     return (
       <div className="min-h-screen bg-zinc-950 text-white p-6 flex flex-col items-center justify-center">
@@ -87,7 +105,6 @@ export default function Home() {
                 </div>
               </motion.div>
               
-              {/* Espacio para futuros modos */}
               <div className="bg-zinc-950 border border-zinc-800 p-8 rounded-2xl flex flex-col justify-between opacity-50 cursor-not-allowed">
                 <div className="space-y-4">
                   <div className="bg-zinc-900 w-fit p-3 rounded-lg">
@@ -114,7 +131,6 @@ export default function Home() {
     );
   }
 
-  // 2. CARGANDO ESTADO DEL JUEGO
   if (loading || !state) {
     return (
       <div className="fixed inset-0 flex items-center justify-center bg-zinc-950">
@@ -123,7 +139,6 @@ export default function Home() {
     );
   }
 
-  // 3. MODO COPYCAT: CONFIGURACIÓN INICIAL
   if (mode === 'copycat' && !state.configured) {
     return (
       <>
@@ -133,7 +148,6 @@ export default function Home() {
     );
   }
 
-  // 4. MODO COPYCAT: JUEGO ACTIVO
   if (mode === 'copycat' && state.configured) {
     return (
       <div className="min-h-screen bg-zinc-950">
@@ -208,7 +222,6 @@ export default function Home() {
     );
   }
 
-  // 5. MODO DESCONOCIDO
   return (
     <div className="min-h-screen bg-zinc-950 flex items-center justify-center text-white">
       <h2>Modo de juego no soportado.</h2>

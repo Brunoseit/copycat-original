@@ -26,10 +26,8 @@ export default function useGameState() {
         if (!socket) return;
         
         const handleUpdate = (data) => {
-            // El servidor ahora envía { room, gameState }
-            if (data.room === room) {
-                console.log(`[${room}] Sincronizando estado recibido del servidor.`);
-                setState({ ...data.gameState });
+            if (data.room === room && data.gameState) {
+                setState(data.gameState);
             }
         };
 
@@ -37,17 +35,18 @@ export default function useGameState() {
         return () => socket.off('update-state', handleUpdate);
     }, [socket, room]);
 
-    // Función envoltorio para emitir cambios al servidor
     const update = (fn) => {
-        setState(prev => {
-            const next = fn(prev);
-            // Solo emitimos si tenemos una sala activa
-            if (room && socket) {
+    setState(prev => {
+        const next = fn(prev);
+        if (room && socket) {
+            // Solo emitimos si algo realmente cambió (comparación básica)
+            if (JSON.stringify(prev) !== JSON.stringify(next)) {
                 socket.emit('game-update', { room, gameState: next });
             }
-            return { ...next };
-        });
-    };
+        }
+        return next;
+    });
+};
 
     const saveToHistory = (result, charId = null) => {
         const history = localStorage.getItem('dbd_match_history');
@@ -75,9 +74,12 @@ export default function useGameState() {
         winCondition: 2, 
         helpers: { emptyBuild: () => ({}) },
         
-        joinRoom: (roomName) => {
-            // joinRoom ya no necesita lógica aquí, el SocketContext se encarga de emitir al servidor
+        // ¡NUEVO! Función para forzar la inyección del estado
+        forceSync: (newState) => {
+            if (newState) setState(newState);
         },
+
+        joinRoom: (roomName) => {},
 
         configure: (num, diff, names) => update(s => ({ 
             ...s, configured: true, num_players: num, difficulty: diff, player_names: names,

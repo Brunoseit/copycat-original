@@ -4,37 +4,39 @@ import { io } from 'socket.io-client';
 const SocketContext = createContext(null);
 
 export const SocketProvider = ({ children }) => {
-    const socket = useMemo(() => io('http://localhost:3000'), []);
+    const socket = useMemo(() => io(), []);
     
     const [room, setRoom] = useState(null);
+    const [roomPass, setRoomPass] = useState(''); // Memoria para auto-reconexiones
     const [isCreator, setIsCreator] = useState(false);
     const [isConnected, setIsConnected] = useState(socket.connected);
 
     useEffect(() => {
-        const onConnect = () => setIsConnected(true);
+        const onConnect = () => {
+            setIsConnected(true);
+            // Si nos reconectamos automáticamente tras una caída, usamos la contraseña guardada
+            if (room) {
+                socket.emit('join-room', { room: room, password: roomPass });
+            }
+        };
         const onDisconnect = () => setIsConnected(false);
 
         socket.on('connect', onConnect);
         socket.on('disconnect', onDisconnect);
-        
-        // CORRECCIÓN: Si nos reconectamos, debemos enviar el objeto completo, no un string
-        if (room) {
-            socket.emit('join-room', { room: room, password: '' });
-        }
 
         return () => {
             socket.off('connect', onConnect);
             socket.off('disconnect', onDisconnect);
         };
-    }, [socket, room]); 
+    }, [socket, room, roomPass]); 
 
     const createRoom = (roomName, password = '', maxPlayers = 4) => {
         return new Promise((resolve) => {
             socket.emit('create-room', { room: roomName, password, maxPlayers }, (response) => {
-                // Si el servidor falla o no responde bien, evitamos que la app se cuelgue
                 const res = response || { success: false, message: 'Error de red' };
                 if (res.success) {
                     setRoom(roomName);
+                    setRoomPass(password); // Guardamos la contraseña
                     setIsCreator(true);
                 }
                 resolve(res);
@@ -48,6 +50,7 @@ export const SocketProvider = ({ children }) => {
                 const res = response || { success: false, message: 'Error de red' };
                 if (res.success) {
                     setRoom(roomName);
+                    setRoomPass(password); // Guardamos la contraseña
                     setIsCreator(res.isCreator);
                 }
                 resolve(res);
@@ -58,6 +61,7 @@ export const SocketProvider = ({ children }) => {
     const leaveRoom = () => {
         if (room) socket.emit('leave-room', room);
         setRoom(null);
+        setRoomPass('');
         setIsCreator(false);
     };
 
