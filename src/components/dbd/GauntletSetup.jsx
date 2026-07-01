@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { dbdSurvivors } from '../../data/dbdData'; // Asumiendo que tienes una lista de supervivientes en tu data
+import { survivors as dbdSurvivors } from '../../data/dbdData'; // Asumiendo que tienes una lista de supervivientes en tu data
 
 export default function GauntletSetup({ onConfigure, onCancel }) {
   // Por defecto marcamos todos
