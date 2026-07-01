@@ -4,7 +4,6 @@ import { Server } from 'socket.io';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
-// Configuraciones para leer rutas de archivos en Node (ES Modules)
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -12,11 +11,10 @@ const app = express();
 const httpServer = createServer(app);
 const io = new Server(httpServer, { cors: { origin: "*" } });
 
-// --- ¡NUEVO! Servir el Frontend empaquetado ---
-// Le decimos a Express que la carpeta 'dist' tiene los archivos públicos (tu app de React)
 app.use(express.static(path.join(__dirname, 'dist')));
 
 let roomData = {}; 
+let leaderboard = []; // ¡NUEVO! Memoria del Top 5 global
 
 const getPublicRooms = () => {
     const publicRooms = [];
@@ -47,8 +45,14 @@ const reassignCreator = (roomName, oldCreatorId) => {
 };
 
 io.on('connection', (socket) => {
+    
     socket.on('get-rooms', () => {
         socket.emit('room-list', getPublicRooms());
+    });
+
+    // ¡NUEVO! Enviar la tabla de líderes cuando el lobby la pide
+    socket.on('get-leaderboard', () => {
+        socket.emit('leaderboard-update', leaderboard);
     });
 
     socket.on('create-room', (payload, callback) => {
@@ -148,6 +152,42 @@ io.on('connection', (socket) => {
         if (roomData[room]) {
             roomData[room].gameState = gameState;
             io.to(room).emit('update-state', { room, gameState });
+
+            // --- ¡NUEVO! LÓGICA DEL LEADERBOARD (Top 5) ---
+            if (gameState && gameState.high_score > 0) {
+                const existingIndex = leaderboard.findIndex(entry => entry.teamName === room);
+                const entry = {
+                    teamName: room,
+                    score: gameState.high_score,
+                    difficulty: gameState.difficulty || 'normal',
+                    numPlayers: gameState.num_players || 0,
+                    playerNames: gameState.player_names || []
+                };
+
+                let changed = false;
+                
+                // Si la sala ya estaba en el top, solo actualizamos si el récord es mayor
+                if (existingIndex >= 0) {
+                    if (leaderboard[existingIndex].score < entry.score) {
+                        leaderboard[existingIndex] = entry;
+                        changed = true;
+                    }
+                } else {
+                    // Si no estaba, verificamos si merece entrar al Top 5
+                    if (leaderboard.length < 5 || entry.score > leaderboard[leaderboard.length - 1].score) {
+                        leaderboard.push(entry);
+                        changed = true;
+                    }
+                }
+
+                if (changed) {
+                    // Ordenar de mayor a menor y mantener solo los 5 primeros
+                    leaderboard.sort((a, b) => b.score - a.score);
+                    if (leaderboard.length > 5) leaderboard = leaderboard.slice(0, 5);
+                    // Avisar a todos en el Lobby del nuevo Top
+                    io.emit('leaderboard-update', leaderboard);
+                }
+            }
         }
     });
 
@@ -163,21 +203,12 @@ io.on('connection', (socket) => {
                 reassignCreator(roomName, socket.id);
             }
         }
-        setTimeout(() => { io.emit('room-list', getPublicRooms()); }, 500);
     });
 });
 
-// --- ¡NUEVO! Forzar a que cualquier ruta que no sea de sockets cargue React ---
-app.use(express.static(path.join(__dirname, 'dist')));
-
-// 2. Ruta para SPA: Todo lo que no sea un archivo estático o una API 
-// debe devolver el index.html para que React Router lo maneje.
-app.get('*', (req, res, next) => {
-    // Si la ruta contiene 'socket.io', dejamos que el servidor de sockets la maneje
+app.use((req, res, next) => {
     if (req.url.includes('socket.io')) return next();
-    
     res.sendFile(path.join(__dirname, 'dist', 'index.html'));
 });
 
-// Levantar el servidor
-httpServer.listen(3000, () => console.log('Servidor Unificado listo en el puerto 3000'));
+httpServer.listen(3000, () => console.log('Servidor Unificado con Leaderboard listo en el puerto 3000'));
