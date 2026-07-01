@@ -3,6 +3,7 @@ import { createServer } from 'http';
 import { Server } from 'socket.io';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import fs from 'fs'; // ¡NUEVO! Importamos la librería para leer y escribir archivos
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -14,7 +15,22 @@ const io = new Server(httpServer, { cors: { origin: "*" } });
 app.use(express.static(path.join(__dirname, 'dist')));
 
 let roomData = {}; 
-let leaderboard = []; // ¡NUEVO! Memoria del Top 5 global
+
+// --- ¡NUEVO! Cargar el Leaderboard desde el disco al iniciar ---
+const LEADERBOARD_FILE = path.join(__dirname, 'leaderboard.json');
+let leaderboard = [];
+
+// Si el archivo existe de antes, lo leemos y recuperamos los récords
+if (fs.existsSync(LEADERBOARD_FILE)) {
+    try {
+        const fileData = fs.readFileSync(LEADERBOARD_FILE, 'utf-8');
+        leaderboard = JSON.parse(fileData);
+        console.log('Récords del Leaderboard recuperados con éxito.');
+    } catch (error) {
+        console.error('Error leyendo el archivo de records:', error);
+    }
+}
+// ----------------------------------------------------------------
 
 const getPublicRooms = () => {
     const publicRooms = [];
@@ -50,7 +66,6 @@ io.on('connection', (socket) => {
         socket.emit('room-list', getPublicRooms());
     });
 
-    // ¡NUEVO! Enviar la tabla de líderes cuando el lobby la pide
     socket.on('get-leaderboard', () => {
         socket.emit('leaderboard-update', leaderboard);
     });
@@ -153,7 +168,7 @@ io.on('connection', (socket) => {
             roomData[room].gameState = gameState;
             io.to(room).emit('update-state', { room, gameState });
 
-            // --- ¡NUEVO! LÓGICA DEL LEADERBOARD (Top 5) ---
+            // LÓGICA DEL LEADERBOARD
             if (gameState && gameState.high_score > 0) {
                 const existingIndex = leaderboard.findIndex(entry => entry.teamName === room);
                 const entry = {
@@ -166,14 +181,12 @@ io.on('connection', (socket) => {
 
                 let changed = false;
                 
-                // Si la sala ya estaba en el top, solo actualizamos si el récord es mayor
                 if (existingIndex >= 0) {
                     if (leaderboard[existingIndex].score < entry.score) {
                         leaderboard[existingIndex] = entry;
                         changed = true;
                     }
                 } else {
-                    // Si no estaba, verificamos si merece entrar al Top 5
                     if (leaderboard.length < 5 || entry.score > leaderboard[leaderboard.length - 1].score) {
                         leaderboard.push(entry);
                         changed = true;
@@ -181,11 +194,16 @@ io.on('connection', (socket) => {
                 }
 
                 if (changed) {
-                    // Ordenar de mayor a menor y mantener solo los 5 primeros
                     leaderboard.sort((a, b) => b.score - a.score);
                     if (leaderboard.length > 5) leaderboard = leaderboard.slice(0, 5);
-                    // Avisar a todos en el Lobby del nuevo Top
                     io.emit('leaderboard-update', leaderboard);
+                    
+                    // --- ¡NUEVO! Guardar físicamente en el archivo cada vez que cambie ---
+                    try {
+                        fs.writeFileSync(LEADERBOARD_FILE, JSON.stringify(leaderboard, null, 2));
+                    } catch (error) {
+                        console.error('Error al guardar el leaderboard en disco:', error);
+                    }
                 }
             }
         }
@@ -211,4 +229,4 @@ app.use((req, res, next) => {
     res.sendFile(path.join(__dirname, 'dist', 'index.html'));
 });
 
-httpServer.listen(3000, () => console.log('Servidor Unificado con Leaderboard listo en el puerto 3000'));
+httpServer.listen(3000, () => console.log('Servidor Unificado con Leaderboard Persistente listo en el puerto 3000'));
