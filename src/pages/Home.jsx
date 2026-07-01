@@ -7,8 +7,10 @@ import SurvivorPhase from '../components/dbd/SurvivorPhase';
 import KillerPhase from '../components/dbd/KillerPhase';
 import ConfirmDialog from '../components/dbd/ConfirmDialog';
 import RulesModal from '../components/dbd/RulesModal';
+import GauntletSetup from '../components/dbd/GauntletSetup.jsx';
+import GauntletActive from '../components/dbd/GauntletActive';
 import { useSocket } from '@/lib/SocketContext';
-import { Play, Loader2, Gamepad2 } from 'lucide-react';
+import { Play, Loader2, Gamepad2, Flame } from 'lucide-react';
 
 export default function Home() {
   const { socket, room, isCreator } = useSocket();
@@ -105,17 +107,21 @@ export default function Home() {
                 </div>
               </motion.div>
               
-              <div className="bg-zinc-950 border border-zinc-800 p-8 rounded-2xl flex flex-col justify-between opacity-50 cursor-not-allowed">
+              <motion.div 
+                whileHover={{ scale: 1.03 }}
+                onClick={() => handleSelectMode('gauntlet')}
+                className="bg-zinc-900 border border-zinc-700 hover:border-orange-500 p-8 rounded-2xl cursor-pointer transition-all flex flex-col justify-between shadow-xl"
+              >
                 <div className="space-y-4">
-                  <div className="bg-zinc-900 w-fit p-3 rounded-lg">
-                    <Loader2 className="w-8 h-8 text-zinc-600" />
+                  <div className="bg-orange-900/20 w-fit p-3 rounded-lg">
+                    <Flame className="w-8 h-8 text-orange-500" />
                   </div>
-                  <h2 className="text-2xl font-bold text-zinc-500">Próximamente...</h2>
-                  <p className="text-zinc-600 leading-relaxed">
-                    Más desafíos y modos de juego están en desarrollo para futuras actualizaciones.
+                  <h2 className="text-2xl font-bold text-white">Survivor Gauntlet</h2>
+                  <p className="text-zinc-400 leading-relaxed">
+                    Escapa con cada superviviente de tu roster. La dificultad sube: pierdes 1 slot de perk cada 10 victorias consecutivas.
                   </p>
                 </div>
-              </div>
+              </motion.div>
             </div>
           </div>
         ) : (
@@ -219,6 +225,28 @@ export default function Home() {
           }}
         />
       </div>
+    );
+  }
+
+  // 5. MODO GAUNTLET: CONFIGURACIÓN INICIAL
+  if (mode === 'gauntlet' && !state.gauntlet_configured) {
+    return (
+      <GauntletSetup 
+        onConfigure={g.configureGauntlet} 
+        onCancel={() => handleSelectMode(null)} 
+      />
+    );
+  }
+
+  // 6. MODO GAUNTLET: JUEGO ACTIVO
+  if (mode === 'gauntlet' && state.gauntlet_configured) {
+    return (
+      <GauntletActive 
+        state={state} 
+        onWin={g.winGauntlet} 
+        onLose={g.loseGauntlet}
+        onReset={() => setConfirmReset(true)}
+      />
     );
   }
 

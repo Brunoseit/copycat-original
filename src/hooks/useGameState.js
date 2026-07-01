@@ -19,6 +19,13 @@ export default function useGameState() {
         survivor_pool: [{ image: '', faced: [] }, { image: '', faced: [] }, { image: '', faced: [] }],
         survivor_expanded: [false, false, false],
         killer_assignments: [],
+        gauntlet_configured: false,
+        gauntlet_wins: 0,
+        gauntlet_roster: [], 
+        gauntlet_remaining: [],
+        gauntlet_current: null,
+        gauntlet_swf: false,
+        gauntlet_penalty: 'reset',
     });
 
     // Sincronización: Escuchar cambios del servidor
@@ -134,6 +141,54 @@ export default function useGameState() {
         }),
 
         resetHighScore: () => update(s => ({ ...s, high_score: 0 })),
+
+        configureGauntlet: (roster, swf, penalty) => update(s => {
+            const shuffled = [...roster].sort(() => Math.random() - 0.5);
+            return {
+                ...s,
+                gauntlet_configured: true,
+                gauntlet_roster: roster,
+                gauntlet_remaining: shuffled.slice(1),
+                gauntlet_current: shuffled[0],
+                gauntlet_swf: swf,
+                gauntlet_penalty: penalty,
+                gauntlet_wins: 0
+            };
+        }),
+
+        winGauntlet: () => update(s => {
+            const nextWins = s.gauntlet_wins + 1;
+            const nextRemaining = [...s.gauntlet_remaining];
+            const nextCurrent = nextRemaining.length > 0 ? nextRemaining.shift() : null;
+            return {
+                ...s,
+                gauntlet_wins: nextWins,
+                gauntlet_current: nextCurrent,
+                gauntlet_remaining: nextRemaining,
+                high_score: Math.max(nextWins, s.high_score)
+            };
+        }),
+
+        loseGauntlet: () => update(s => {
+            if (s.gauntlet_penalty === 'reset') {
+                const shuffled = [...s.gauntlet_roster].sort(() => Math.random() - 0.5);
+                return {
+                    ...s,
+                    gauntlet_wins: 0,
+                    gauntlet_remaining: shuffled.slice(1),
+                    gauntlet_current: shuffled[0]
+                };
+            } else {
+                const checkpointWins = Math.floor(s.gauntlet_wins / 10) * 10;
+                const nextRemaining = [...s.gauntlet_remaining, s.gauntlet_current];
+                return {
+                    ...s,
+                    gauntlet_wins: checkpointWins,
+                    gauntlet_current: nextRemaining.shift(),
+                    gauntlet_remaining: nextRemaining
+                };
+            }
+        }),
         
         startKillerPhase: () => update(s => {
             const assignments = s.survivor_matches.map((match, index) => ({
